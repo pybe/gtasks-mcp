@@ -201,6 +201,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["id", "uri"],
         },
       },
+      {
+        name: "list-tasklists",
+        description: "List all task lists in Google Tasks",
+        inputSchema: {
+          type: "object",
+          properties: {},
+        },
+      },
     ],
   };
 });
@@ -229,6 +237,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   if (request.params.name === "clear") {
     const taskResult = await TaskActions.clear(request, tasks);
     return taskResult;
+  }
+  if (request.params.name === "list-tasklists") {
+    const response = await tasks.tasklists.list();
+    const taskLists = response.data.items || [];
+    const formatted = taskLists.map((list) =>
+      `${list.title} (ID: ${list.id})`
+    ).join("\n");
+    return {
+      content: [
+        {
+          type: "text",
+          text: taskLists.length > 0
+            ? `Found ${taskLists.length} task lists:\n${formatted}`
+            : "No task lists found",
+        },
+      ],
+    };
   }
   throw new Error("Tool not found");
 });
@@ -263,8 +288,21 @@ async function loadCredentialsAndRunServer() {
   }
 
   const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
-  const auth = new google.auth.OAuth2();
+
+  // Load OAuth app credentials to enable token refresh
+  const oauthKeysPath = path.join(path.dirname(credentialsPath), "gcp-oauth.keys.json");
+  const oauthKeys = JSON.parse(fs.readFileSync(oauthKeysPath, "utf-8"));
+  const { client_id, client_secret } = oauthKeys.installed;
+
+  const auth = new google.auth.OAuth2(client_id, client_secret);
   auth.setCredentials(credentials);
+
+  // Auto-save refreshed tokens
+  auth.on('tokens', (tokens) => {
+    const updated = { ...credentials, ...tokens };
+    fs.writeFileSync(credentialsPath, JSON.stringify(updated, null, 2));
+  });
+
   google.options({ auth });
 
   const transport = new StdioServerTransport();
