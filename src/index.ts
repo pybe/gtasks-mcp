@@ -13,6 +13,7 @@ import {
 import fs from "fs";
 import { google, tasks_v1 } from "googleapis";
 import path from "path";
+import { fileURLToPath } from "url";
 import { TaskActions, TaskResources } from "./Tasks.js";
 
 const tasks = google.tasks("v1");
@@ -259,14 +260,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 const credentialsPath = path.join(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../.gtasks-server-credentials.json",
 );
 
 async function authenticateAndSaveCredentials() {
   console.log("Launching auth flow…");
   const p = path.join(
-    path.dirname(new URL(import.meta.url).pathname),
+    path.dirname(fileURLToPath(import.meta.url)),
     "../gcp-oauth.keys.json",
   );
 
@@ -290,7 +291,9 @@ async function loadCredentialsAndRunServer() {
   const credentials = JSON.parse(fs.readFileSync(credentialsPath, "utf-8"));
 
   // Load OAuth app credentials to enable token refresh
-  const oauthKeysPath = path.join(path.dirname(credentialsPath), "gcp-oauth.keys.json");
+  // Support GOOGLE_OAUTH_CREDENTIALS env var for shared credential location
+  const oauthKeysPath = process.env.GOOGLE_OAUTH_CREDENTIALS ||
+    path.join(path.dirname(credentialsPath), "gcp-oauth.keys.json");
   const oauthKeys = JSON.parse(fs.readFileSync(oauthKeysPath, "utf-8"));
   const { client_id, client_secret } = oauthKeys.installed;
 

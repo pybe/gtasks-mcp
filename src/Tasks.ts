@@ -93,6 +93,37 @@ export class TaskActions {
     return taskList.map((task) => this.formatTask(task)).join("\n");
   }
 
+  // Normalize date strings to RFC3339 format required by Google Tasks API
+  private static normalizeDate(dateStr: string | undefined): string | undefined {
+    if (!dateStr) return undefined;
+
+    // Already has timezone (ends with Z or +/-offset)
+    if (/Z$|[+-]\d{2}:\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+
+    // Date only (YYYY-MM-DD) - add time and Z
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return `${dateStr}T00:00:00.000Z`;
+    }
+
+    // DateTime without timezone - add Z
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(dateStr)) {
+      // Remove any milliseconds and add Z
+      const base = dateStr.replace(/\.\d+$/, '');
+      return `${base}.000Z`;
+    }
+
+    // Try to parse and convert
+    const date = new Date(dateStr);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+
+    // Return as-is if we can't parse (let API handle the error)
+    return dateStr;
+  }
+
   private static async _list(request: CallToolRequest, tasks: tasks_v1.Tasks) {
     const taskListsResponse = await tasks.tasklists.list({
       maxResults: MAX_TASK_RESULTS,
@@ -134,7 +165,7 @@ export class TaskActions {
     const task = {
       title: taskTitle,
       notes: taskNotes,
-      due: taskDue,
+      due: this.normalizeDate(taskDue),
     };
 
     const taskResponse = await tasks.tasks.insert({
@@ -176,7 +207,7 @@ export class TaskActions {
       title: taskTitle,
       notes: taskNotes,
       status: taskStatus,
-      due: taskDue,
+      due: this.normalizeDate(taskDue),
     };
 
     const taskResponse = await tasks.tasks.update({
