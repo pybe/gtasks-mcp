@@ -259,7 +259,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   throw new Error("Tool not found");
 });
 
-const credentialsPath = path.join(
+// Support GOOGLE_OAUTH_TOKENS env var for shared token location
+const credentialsPath = process.env.GOOGLE_OAUTH_TOKENS || path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   "../.gtasks-server-credentials.json",
 );
